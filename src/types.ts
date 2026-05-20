@@ -28,6 +28,13 @@ export interface BountyClaimStatus {
   submittedSolutions: number;
   reservedForInterview: boolean;
   assignedTo: string[];
+  graveyard?: GraveyardSignal;
+}
+
+export interface GraveyardSignal {
+  openPullRequests: number;
+  mergedPullRequests: number;
+  oldestOpenPrAgeDays: number;
 }
 
 export interface RepoMetadata {

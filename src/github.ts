@@ -56,6 +56,78 @@ export class GitHubClient {
     }
   }
 
+  async fetchClaimingPullRequests(
+    repoFullName: string,
+    issueNumber: number,
+  ): Promise<{ openPullRequests: number; mergedPullRequests: number; oldestOpenPrAgeDays: number }> {
+    const cacheKey = `claims:${repoFullName}:${issueNumber}`;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey) as {
+        openPullRequests: number;
+        mergedPullRequests: number;
+        oldestOpenPrAgeDays: number;
+      };
+    }
+
+    const empty = { openPullRequests: 0, mergedPullRequests: 0, oldestOpenPrAgeDays: 0 };
+    try {
+      const events = (await $`gh api repos/${repoFullName}/issues/${issueNumber}/timeline --paginate`
+        .quiet()
+        .json()) as Array<{
+        event: string;
+        source?: { issue?: { number: number; pull_request?: { merged_at: string | null } } };
+      }>;
+
+      const referencedPrNumbers = new Set<number>();
+      for (const event of events) {
+        if (event.event === "cross-referenced" && event.source?.issue?.pull_request) {
+          referencedPrNumbers.add(event.source.issue.number);
+        }
+      }
+      if (referencedPrNumbers.size === 0) {
+        this.cache.set(cacheKey, empty);
+        return empty;
+      }
+
+      let openPullRequests = 0;
+      let mergedPullRequests = 0;
+      let oldestOpenAt = Number.POSITIVE_INFINITY;
+
+      await Promise.all(
+        Array.from(referencedPrNumbers).map(async (prNumber) => {
+          try {
+            const pr = (await $`gh api repos/${repoFullName}/pulls/${prNumber}`.quiet().json()) as {
+              state: "open" | "closed";
+              merged_at: string | null;
+              created_at: string;
+            };
+            if (pr.merged_at) {
+              mergedPullRequests++;
+            } else if (pr.state === "open") {
+              openPullRequests++;
+              const createdAt = new Date(pr.created_at).getTime();
+              if (createdAt < oldestOpenAt) oldestOpenAt = createdAt;
+            }
+          } catch {
+            // ignore individual PR failures
+          }
+        }),
+      );
+
+      const oldestOpenPrAgeDays =
+        openPullRequests > 0 && Number.isFinite(oldestOpenAt)
+          ? (Date.now() - oldestOpenAt) / 86_400_000
+          : 0;
+
+      const result = { openPullRequests, mergedPullRequests, oldestOpenPrAgeDays };
+      this.cache.set(cacheKey, result);
+      return result;
+    } catch {
+      this.cache.set(cacheKey, empty);
+      return empty;
+    }
+  }
+
   async fetchRateLimit(): Promise<{
     search: { remaining: number; reset: number };
     core: { remaining: number; reset: number };

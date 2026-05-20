@@ -75,10 +75,15 @@ export function renderBounty(bounty: ScoredBounty, rank: number): string {
 
   const headline = `${ANSI.dim}#${String(rank).padStart(2)}${ANSI.reset}  ${style.color}${style.icon} ${style.label}${ANSI.reset}  ${ANSI.bold}${truncate(issue.title, 80)}${ANSI.reset}`;
 
-  const claimLine =
-    claim.attempts > 0 || claim.assignedTo.length > 0 || claim.reservedForInterview
-      ? `   ${ANSI.dim}claims${ANSI.reset}   ${formatClaimSummary(claim)}`
-      : `   ${ANSI.dim}claims${ANSI.reset}   ${ANSI.green}none yet${ANSI.reset}`;
+  const hasClaimSignal =
+    claim.attempts > 0 ||
+    claim.assignedTo.length > 0 ||
+    claim.reservedForInterview ||
+    (claim.graveyard && claim.graveyard.openPullRequests + claim.graveyard.mergedPullRequests > 0);
+
+  const claimLine = hasClaimSignal
+    ? `   ${ANSI.dim}claims${ANSI.reset}   ${formatClaimSummary(claim)}`
+    : `   ${ANSI.dim}claims${ANSI.reset}   ${ANSI.green}none yet${ANSI.reset}`;
 
   const meta = [
     `   ${ANSI.dim}repo${ANSI.reset}     ${repo.full_name}  ${ANSI.dim}(${repo.stargazers_count.toLocaleString()}★)${ANSI.reset}`,
@@ -116,6 +121,16 @@ function formatClaimSummary(claim: ScoredBounty["claim"]): string {
   if (claim.attempts > 0) {
     const detail = `${claim.attempts} attempts (${claim.wipAttempts} WIP, ${claim.submittedSolutions} PRs)`;
     parts.push(claim.attempts > 3 ? `${ANSI.red}${detail}${ANSI.reset}` : `${ANSI.yellow}${detail}${ANSI.reset}`);
+  }
+  if (claim.graveyard) {
+    const { openPullRequests, mergedPullRequests } = claim.graveyard;
+    if (openPullRequests >= 5 && mergedPullRequests === 0) {
+      parts.push(`${ANSI.red}${openPullRequests} open PRs / 0 merged — graveyard${ANSI.reset}`);
+    } else if (openPullRequests > 0 || mergedPullRequests > 0) {
+      parts.push(
+        `${ANSI.dim}${openPullRequests} open PRs · ${mergedPullRequests} merged${ANSI.reset}`,
+      );
+    }
   }
   return parts.join("  ");
 }

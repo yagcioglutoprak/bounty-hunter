@@ -50,8 +50,12 @@ async function main(): Promise<void> {
 
   const scored = await Promise.all(
     candidates.map(async ({ issue, repo }) => {
-      const algoraComment = await client.fetchAlgoraBotComment(repo.full_name, issue.number);
+      const [algoraComment, graveyard] = await Promise.all([
+        client.fetchAlgoraBotComment(repo.full_name, issue.number),
+        client.fetchClaimingPullRequests(repo.full_name, issue.number),
+      ]);
       const claim = parseClaimStatus(issue, algoraComment);
+      claim.graveyard = graveyard;
       return scoreIssue(issue, repo, claim);
     }),
   );

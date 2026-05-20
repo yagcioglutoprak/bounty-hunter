@@ -118,6 +118,25 @@ export function scoreIssue(
   const goScore = computeGoScore(trust, effort, competition, claim);
   const verdict = decideVerdict(trust, claim);
 
+  if (claim.graveyard) {
+    const { openPullRequests, mergedPullRequests, oldestOpenPrAgeDays } = claim.graveyard;
+    if (openPullRequests >= 5 && mergedPullRequests === 0) {
+      reasons.push({
+        signal: "bounty-graveyard",
+        delta: -25,
+        detail: `${openPullRequests} open PRs claiming this bounty, ${mergedPullRequests} merged — owner doesn't pay out`,
+      });
+      trust = clamp(trust - 25, 0, 100);
+    } else if (openPullRequests >= 3 && oldestOpenPrAgeDays > 180) {
+      reasons.push({
+        signal: "stale-claims",
+        delta: -10,
+        detail: `${openPullRequests} open PRs, oldest ${Math.round(oldestOpenPrAgeDays)} days unmerged`,
+      });
+      trust = clamp(trust - 10, 0, 100);
+    }
+  }
+
   if (claim.reservedForInterview) {
     reasons.push({
       signal: "reserved-for-interview",
