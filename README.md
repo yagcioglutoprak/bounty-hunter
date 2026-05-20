@@ -85,6 +85,13 @@ bun src/cli.ts --watch --interval 180 --min 50
 
 State lives at `~/.bounty-hunter-state.json` (override via `BOUNTY_HUNTER_STATE`). First run does a silent sync of existing issues so you don't get spammed with everything that's already there.
 
+### Fast mode
+Skip per-issue enrichment (algora bot table + cross-referenced PR timeline). Used by the bundled GitHub Actions workflow. Trust score still works; claim/graveyard signals are skipped.
+
+```bash
+bun src/cli.ts --fast --json -n 25
+```
+
 ### Hosted via GitHub Actions
 The included `.github/workflows/bounty-watch.yml` runs the watcher every 30 minutes on GitHub's runners and opens a digest issue when fresh promising bounties (`goScore ≥ 60`) appear. Fork the repo, enable Actions, and it just works.
 
@@ -102,6 +109,10 @@ The honeypot crop rotates weekly — new templates, new naming patterns, same sh
 Stack: TypeScript on Bun, no external HTTP client (uses the `gh` CLI under the hood for authenticated rate limits). Everything is in `src/` — `cli.ts` for arg parsing, `github.ts` for API access, `scoring.ts` for the signal engine, `claims.ts` for the algora-pbc bot table parser, `watch.ts` for polling, `render.ts` for ANSI output.
 
 Why Bun? Native TypeScript, zero build step, 30ms cold start. The whole tool is one `bun src/cli.ts` away.
+
+## Companion tools
+
+[**repo-grader**](https://github.com/yagcioglutoprak/repo-grader) — score any GitHub repo on PR welcomeness (A–F letter grade). Bounty-hunter tells you which bounties to chase; repo-grader tells you which repos are worth chasing them in.
 
 ## License
 
