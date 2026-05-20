@@ -1,0 +1,83 @@
+name: bounty-watch
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      query:
+        description: GitHub search query
+        required: false
+        default: 'label:"💎 Bounty" state:open is:issue'
+      min_amount:
+        description: Minimum USD amount
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: bounty-watch
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Restore seen-issue state
+        uses: actions/cache@v4
+        with:
+          path: .bounty-hunter-state.json
+          key: bounty-hunter-state-v1-${{ github.run_id }}
+          restore-keys: |
+            bounty-hunter-state-v1-
+
+      - name: Poll for fresh bounties
+        id: poll
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BOUNTY_HUNTER_STATE: ${{ github.workspace }}/.bounty-hunter-state.json
+          QUERY: ${{ inputs.query || 'label:"💎 Bounty" state:open is:issue' }}
+          MIN: ${{ inputs.min_amount || '0' }}
+        run: |
+          # Inputs are read from env vars (QUERY, MIN), never interpolated
+          # directly into the shell — see GitHub Actions injection guide.
+          bun run src/cli.ts --json --query "$QUERY" --min "$MIN" -n 25 > /tmp/results.json
+          jq -r '.[] | select(.verdict == "promising" or .verdict == "legit") | select(.goScore >= 60) | "\(.issue.html_url) | $\(.amountUsd // 0) | go=\(.goScore) | trust=\(.trustScore)"' /tmp/results.json > /tmp/promising.txt || true
+          if [ -s /tmp/promising.txt ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'body<<DIGEST_EOF'
+              echo "## Fresh promising bounties"
+              echo ""
+              while IFS= read -r line; do echo "- $line"; done < /tmp/promising.txt
+              echo "DIGEST_EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open digest issue
+        if: steps.poll.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Body comes from our own JSON output (not from a GitHub event),
+          # but we still quote via env var per defence-in-depth.
+          DIGEST_BODY: ${{ steps.poll.outputs.body }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          gh issue create \
+            --title "Bounty digest — $DATE" \
+            --label "bounty-digest" \
+            --body "$DIGEST_BODY"

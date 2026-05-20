@@ -1,13 +1,42 @@
 {
-  "name": "bounty-hunter",
-  "version": "0.1.0",
-  "description": "Find legitimate open-source bounties, dodge honeypots.",
+  "name": "bounty-hunter-cli",
+  "version": "0.2.0",
+  "description": "Find legitimate open-source bounties on GitHub. Filter out the AI-baited honeypot repos.",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "bin": {
+    "bounty-hunter": "./src/cli.ts"
+  },
   "module": "src/cli.ts",
   "scripts": {
     "hunt": "bun run src/cli.ts",
+    "watch": "bun run src/cli.ts --watch",
     "test": "bun test"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "bounty",
+    "open-source",
+    "github",
+    "algora",
+    "cli",
+    "honeypot",
+    "scoring"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yagcioglutoprak/bounty-hunter.git"
+  },
+  "homepage": "https://github.com/yagcioglutoprak/bounty-hunter",
+  "bugs": {
+    "url": "https://github.com/yagcioglutoprak/bounty-hunter/issues"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest"

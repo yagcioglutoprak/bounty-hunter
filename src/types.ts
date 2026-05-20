@@ -84,4 +84,6 @@ export interface HuntOptions {
   query?: string;
   showAll: boolean;
   json: boolean;
+  watch: boolean;
+  intervalSeconds: number;
 }

@@ -9,6 +9,7 @@ import {
   renderHeader,
   renderRecommendation,
 } from "./render.ts";
+import { runWatch } from "./watch.ts";
 import type { HuntOptions, ScoredBounty } from "./types.ts";
 
 const DEFAULT_QUERY = 'label:"💎 Bounty" state:open is:issue';
@@ -19,6 +20,15 @@ async function main(): Promise<void> {
   if (options === null) {
     printUsage();
     process.exit(0);
+  }
+
+  if (options.watch) {
+    await runWatch({
+      query: options.query ?? DEFAULT_QUERY,
+      minAmount: options.minAmount,
+      intervalSeconds: options.intervalSeconds,
+    });
+    return;
   }
 
   const client = new GitHubClient();
@@ -105,6 +115,8 @@ function parseArgs(argv: string[]): HuntOptions | null {
     maxAmount: Number.POSITIVE_INFINITY,
     showAll: false,
     json: false,
+    watch: false,
+    intervalSeconds: 300,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -130,6 +142,13 @@ function parseArgs(argv: string[]): HuntOptions | null {
       case "--json":
         options.json = true;
         break;
+      case "--watch":
+      case "-w":
+        options.watch = true;
+        break;
+      case "--interval":
+        options.intervalSeconds = Math.max(60, Number.parseInt(argv[++i] ?? "300", 10));
+        break;
       default:
         process.stderr.write(`unknown flag: ${arg}\n`);
         process.exit(2);
@@ -145,21 +164,24 @@ function printUsage(): void {
       "",
       "  bounty-hunter — find legitimate open-source bounties, dodge honeypots",
       "",
-      "  usage:  bun run hunt [flags]",
+      "  usage:  bun src/cli.ts [flags]",
       "",
       "  flags:",
-      "    -n, --limit N        max bounties to show (default 10)",
-      "        --min N          minimum USD amount (default 0)",
-      "        --max N          maximum USD amount (default ∞)",
-      "    -q, --query STRING   override GitHub search query",
-      "        --show-all       include honeypot-flagged results",
-      "        --json           emit raw JSON",
-      "    -h, --help           show this help",
+      "    -n, --limit N          max bounties to show (default 10)",
+      "        --min N            minimum USD amount (default 0)",
+      "        --max N            maximum USD amount (default ∞)",
+      "    -q, --query STRING     override GitHub search query",
+      "        --show-all         include honeypot-flagged results",
+      "        --json             emit raw JSON",
+      "    -w, --watch            poll continuously, alert on fresh bounties",
+      "        --interval SEC     watch poll interval (default 300, min 60)",
+      "    -h, --help             show this help",
       "",
       "  examples:",
-      "    bun run hunt --min 20 --max 500",
-      "    bun run hunt -n 5 --query 'label:bounty state:open language:typescript'",
-      "    bun run hunt --json | jq '.[0].issue.html_url'",
+      "    bun src/cli.ts --min 20 --max 500",
+      "    bun src/cli.ts -n 5 --query 'label:bounty state:open language:typescript'",
+      "    bun src/cli.ts --watch --interval 180 --min 50",
+      "    bun src/cli.ts --json | jq '.[0].issue.html_url'",
       "",
     ].join("\n"),
   );
