@@ -45,6 +45,7 @@ jobs:
 
       - name: Poll for fresh bounties
         id: poll
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOUNTY_HUNTER_STATE: ${{ github.workspace }}/.bounty-hunter-state.json
@@ -53,7 +54,8 @@ jobs:
         run: |
           # Inputs are read from env vars (QUERY, MIN), never interpolated
           # directly into the shell — see GitHub Actions injection guide.
-          bun run src/cli.ts --json --query "$QUERY" --min "$MIN" -n 25 > /tmp/results.json
+          # --fast skips per-issue enrichment to keep CI runs under a minute.
+          bun run src/cli.ts --fast --json --query "$QUERY" --min "$MIN" -n 25 > /tmp/results.json
           jq -r '.[] | select(.verdict == "promising" or .verdict == "legit") | select(.goScore >= 60) | "\(.issue.html_url) | $\(.amountUsd // 0) | go=\(.goScore) | trust=\(.trustScore)"' /tmp/results.json > /tmp/promising.txt || true
           if [ -s /tmp/promising.txt ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"

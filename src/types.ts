@@ -86,4 +86,5 @@ export interface HuntOptions {
   json: boolean;
   watch: boolean;
   intervalSeconds: number;
+  fast: boolean;
 }

@@ -60,10 +60,14 @@ async function main(): Promise<void> {
 
   const scored = await Promise.all(
     candidates.map(async ({ issue, repo }) => {
-      const [algoraComment, graveyard] = await Promise.all([
-        client.fetchAlgoraBotComment(repo.full_name, issue.number),
-        client.fetchClaimingPullRequests(repo.full_name, issue.number),
-      ]);
+      let algoraComment: string | null = null;
+      let graveyard = { openPullRequests: 0, mergedPullRequests: 0, oldestOpenPrAgeDays: 0 };
+      if (!options.fast) {
+        [algoraComment, graveyard] = await Promise.all([
+          client.fetchAlgoraBotComment(repo.full_name, issue.number),
+          client.fetchClaimingPullRequests(repo.full_name, issue.number),
+        ]);
+      }
       const claim = parseClaimStatus(issue, algoraComment);
       claim.graveyard = graveyard;
       return scoreIssue(issue, repo, claim);
@@ -117,6 +121,7 @@ function parseArgs(argv: string[]): HuntOptions | null {
     json: false,
     watch: false,
     intervalSeconds: 300,
+    fast: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -148,6 +153,9 @@ function parseArgs(argv: string[]): HuntOptions | null {
         break;
       case "--interval":
         options.intervalSeconds = Math.max(60, Number.parseInt(argv[++i] ?? "300", 10));
+        break;
+      case "--fast":
+        options.fast = true;
         break;
       default:
         process.stderr.write(`unknown flag: ${arg}\n`);
